@@ -39,7 +39,13 @@ uint32_t xorshift32(uint32_t state[static 1]) {
 }
 
 /*
- * Incarcarea imaginii in memoria interna
+ * Incarcarea imaginii in memoria interna.
+ *
+ * Parametri:
+ * path_to_image - numele fisierului
+ *
+ * Returneaza o structura image cu valorile corespunzatoare fiecarui camp
+ * sau o structura goala in cazul in care nu s-a putut face citirea.
  */
 image load_image(char* path_to_image) {
     int32_t k;
@@ -113,7 +119,12 @@ image load_image(char* path_to_image) {
 }
 
 /*
- * Salvarea imaginii in memoria externa
+ * Salvarea imaginii in memoria externa.
+ *
+ * Parametri:
+ * path_to_save - numele fisierului
+ * image - structura care are informatia
+ *
  * Returneaza:
  * false - daca nu s-a putut salva imaginea
  * true - daca nu a fost nici-o problema
@@ -165,7 +176,11 @@ bool save_image(char *path_to_save, image image) {
 }
 
 /*
- * Citirea cheilor secrete din fisier
+ * Citirea cheilor secrete din fisier.
+ *
+ * Parametri:
+ * path_to_secret - numele fisierului cu cheiile secrete
+ *
  * Returneaza o structura secret_key cu valorile corespunzatoare fiecarui camp
  * sau o structura goala in cazul in care nu s-a putut face citirea.
  */
@@ -191,6 +206,17 @@ secret_key get_secret_key(char *path_to_secret) {
     return temp_secret;
 }
 
+/*
+ * Genereaza cele 2*W*H-1 valori pseudo-random folosind algoritmul xorshift32.
+ *
+ * Parametri:
+ * seed - valoarea cheii secrete
+ * block_size - marimea w*h a imaginii
+ *
+ * Returneaza:
+ * pointer catre inceputul tabloului de valori pseudo-random
+ * sau pointerul NULL daca nu s-a putut face alocarea de memorie.
+ */
 uint32_t* generate_random_values(uint32_t seed, uint32_t block_size) {
     uint32_t *r = (uint32_t*) calloc(block_size, sizeof(uint32_t));
     size_t i;
@@ -205,6 +231,17 @@ uint32_t* generate_random_values(uint32_t seed, uint32_t block_size) {
     return r;
 }
 
+/*
+ * Genereaza permutarea necesara pentru interschimbarea pixelilor.
+ *
+ * Paramteri:
+ * *r - pointer la inceputul tabloului de valori pseudo-aleatoare
+ * block_size - marimea w*h a imaginii
+ *
+ * Returneaza:
+ * un pointer catre inceputul tabloului de permutari
+ * sau pointerul NULL daca nu s-a putut face alocarea de memorie
+ */
 uint32_t* generate_permutation(uint32_t* r, uint32_t block_size) {
     uint32_t *permutation = (uint32_t*) calloc(block_size, sizeof(uint32_t)), i, random;
     if (permutation == NULL) {
@@ -223,33 +260,72 @@ uint32_t* generate_permutation(uint32_t* r, uint32_t block_size) {
     return permutation;
 }
 
-bool crypting_method(char *path_to_image, char *path_to_crypt, char *secret_path) {
+/*
+ * Se realizeaza copierea header-ului imaginii originale in cea criptata,
+ * se permuta fiecare pixel si se cripteaza conform problemei.
+ *
+ * Parametri:
+ * real_image - structura imaginii care trebuie criptata
+ * *r - pointer la inceputul tabloului de valori pseudo-aleatoare
+ * *permutation - pointer la inceputul permutarii
+ * SV - cheia secreta
+ *
+ * Se presupune ca *r si *permutation au marimile necesare altfel nu se
+ * ajunge pana la apelul acestei functii.
+ *
+ * Returneaza imaginea criptata cu valorile corespunzatoare fiecarui camp
+ * sau o structura goala in cazul in care nu s-a putut aloca numarul de pixeli necesari.
+ */
+image crypting_method(image real_image, uint32_t *r, uint32_t *permutation, uint32_t SV) {
+    image ciphered_image;
+    uint32_t size = (uint32_t)real_image.header.width * real_image.header.height , i;
+
+    ciphered_image.header = real_image.header;
+    ciphered_image.pixels = (image_colors*) calloc(size, sizeof(image_colors));
+    if (ciphered_image.pixels == NULL) {
+        printf("Nu s-a putut aloca memorie necesara pentru imaginea criptata.");
+        return NOTHING_IMAGE;
+    }
+    // Permutarea pixelilor conform permutari
+    for (i = 0; i < size; i ++)
+        (*(ciphered_image.pixels + *(permutation+i))) = (*(real_image.pixels + i));
+
+    // Initializarea primului pixel conform C(0)=SV^P'(0)^r(w*h)
+    (*(ciphered_image.pixels)).R = (unsigned char)((SV)^(*(ciphered_image.pixels)).R^(*(r+size)));
+    (*(ciphered_image.pixels)).G = (unsigned char)((SV)^(*(ciphered_image.pixels)).G^(*(r+size)));
+    (*(ciphered_image.pixels)).B = (unsigned char)((SV)^(*(ciphered_image.pixels)).B^(*(r+size)));
+
+    // Generarea restului de pixeli conform C(k)=C(k-1)^P'(k)^r(w*h+k)
+    for (i = 1; i < (uint32_t)(real_image.header.width*real_image.header.height); i ++) {
+        (*(ciphered_image.pixels + i)).R = (unsigned char)(((*(ciphered_image.pixels + (i-1))).R)^((*(ciphered_image.pixels)).R)^(*(r+size+i)));
+        (*(ciphered_image.pixels + i)).G = (unsigned char)(((*(ciphered_image.pixels + (i-1))).G)^((*(ciphered_image.pixels)).G)^(*(r+size+i)));
+        (*(ciphered_image.pixels + i)).B = (unsigned char)(((*(ciphered_image.pixels + (i-1))).B)^((*(ciphered_image.pixels)).B)^(*(r+size+i)));
+    }
+    return ciphered_image;
+}
+
+/*
+ * Functia de criptare a imaginii
+ *
+ * Parametri:
+ * path_to_image - imaginea ce urmeaza sa fie criptata
+ * path_to_crypt - imaginea criptata
+ * secret_path - fisierul ce contine cele 2 chei secrete
+ *
+ * Returneaza:
+ * false - daca nu s-a putut crea imaginea criptata
+ * true - daca nu a fost nici-o problema in crearea imaginii
+ */
+bool crypting_image(char *path_to_image, char *path_to_crypt, char *secret_path) {
     image image, image_ciphered;
     secret_key secret = get_secret_key(secret_path);
     image = load_image(path_to_image);
     uint32_t block_size = (uint32_t)image.header.width*image.header.height;
-    uint32_t i, *r , *permutation;
+    uint32_t *r , *permutation;
 
-    if ((r = generate_random_values((uint32_t)secret.secret_r0, 2*block_size)) == NULL) return false;
+    if ((r = generate_random_values(secret.secret_r0, 2*block_size)) == NULL) return false;
     if ((permutation = generate_permutation(r, block_size)) == NULL) return false;
-
-
-    image_ciphered.header = image.header;
-    image_ciphered.pixels = (image_colors*) calloc((size_t)image.header.width * (size_t)image.header.height, sizeof(image_colors));
-    //de verificat
-    for (i = 0; i < (uint32_t)(image.header.width*image.header.height); i ++)
-        (*(image_ciphered.pixels + *(permutation+i))) = (*(image.pixels + i));
-
-    (*(image_ciphered.pixels)).R = (unsigned char)((secret.SV)^(*(image_ciphered.pixels)).R^(*(r+image.header.width*image.header.height)));
-    (*(image_ciphered.pixels)).G = (unsigned char)((secret.SV)^(*(image_ciphered.pixels)).G^(*(r+image.header.width*image.header.height)));
-    (*(image_ciphered.pixels)).B = (unsigned char)((secret.SV)^(*(image_ciphered.pixels)).B^(*(r+image.header.width*image.header.height)));
-
-    for (i = 1; i < (uint32_t)(image.header.width*image.header.height); i ++) {
-        (*(image_ciphered.pixels + i)).R = (unsigned char)(((*(image_ciphered.pixels + (i-1))).R)^((*(image_ciphered.pixels)).R)^(*(r+image.header.width*image.header.height+i)));
-        (*(image_ciphered.pixels + i)).G = (unsigned char)(((*(image_ciphered.pixels + (i-1))).G)^((*(image_ciphered.pixels)).G)^(*(r+image.header.width*image.header.height+i)));
-        (*(image_ciphered.pixels + i)).B = (unsigned char)(((*(image_ciphered.pixels + (i-1))).B)^((*(image_ciphered.pixels)).B)^(*(r+image.header.width*image.header.height+i)));
-
-    }
+    image_ciphered = crypting_method(image, permutation, r, secret.SV);
     save_image(path_to_crypt, image_ciphered);
     return true;
 }

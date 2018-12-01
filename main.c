@@ -12,6 +12,6 @@
 
 int main() {
 
-    crypting_method("peppers.bmp","haha.bmp", "secret_key.txt");
+    crypting_image("peppers.bmp","hah1a.bmp", "secret_key.txt");
     return 0;
 }
