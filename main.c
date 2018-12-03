@@ -13,5 +13,9 @@
 int main() {
 
     crypting_image("peppers.bmp","hah1a.bmp", "secret_key.txt");
+    decrypting_image("hah1a.bmp","dasdas.bmp", "secret_key.txt");
+    chisquare_test("hah1a.bmp");
+
+
     return 0;
 }

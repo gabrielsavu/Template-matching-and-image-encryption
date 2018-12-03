@@ -48,8 +48,7 @@ uint32_t xorshift32(uint32_t state[static 1]) {
  * sau o structura goala in cazul in care nu s-a putut face citirea.
  */
 image load_image(char* path_to_image) {
-    int32_t k;
-    unsigned char byte;
+    int32_t i, j, contor = 0;
     image tmp_image;
     char route[PATH_MAX];
     FILE *file;
@@ -76,6 +75,8 @@ image load_image(char* path_to_image) {
     fread(&(tmp_image.header.offset), 1, 4, file);
     fread(&(tmp_image.header.bitmapinfo), 1, 4, file);
     fread(&(tmp_image.header.width), 1, 4, file);
+    if(tmp_image.header.width % 4 != 0) tmp_image.padding = 4 - (3 * tmp_image.header.width) % 4;
+    else tmp_image.padding = 0;
     fread(&(tmp_image.header.height), 1, 4, file);
     fread(&(tmp_image.header.no_planes), 1, 2, file);
     fread(&(tmp_image.header.no_bits_pixel), 1, 2, file);
@@ -93,25 +94,15 @@ image load_image(char* path_to_image) {
         printf("Eroare la alocarea de memorie necesara pentru imagine.\n");
         return NOTHING_IMAGE;
     }
-
-
-
     // Salvam fiecare valoare a fiecarui pixel in variabila declarata mai sus
-    for (k = 0; k < 3*tmp_image.header.width*tmp_image.header.height; k ++) {
-        fread(&byte, 1, 1, file);
-        switch (k%3) {
-            case 0:
-                (*(tmp_image.pixels+(k/3))).B = byte;
-                break;
-            case 1:
-                (*(tmp_image.pixels+(k/3))).G = byte;
-                break;
-            case 2:
-                (*(tmp_image.pixels+(k/3))).R = byte;
-                break;
-            default:
-                break;
+    for (i = 0; i < tmp_image.header.height; i ++) {
+        for (j = 0; j < tmp_image.header.width; j ++) {
+            fread(&(*(tmp_image.pixels + contor)).B, 1, 1, file);
+            fread(&(*(tmp_image.pixels + contor)).G, 1, 1, file);
+            fread(&(*(tmp_image.pixels + contor)).R, 1, 1, file);
+            contor ++ ;
         }
+        fseek(file, tmp_image.padding, SEEK_CUR);
     }
     // Inchidem fisierul deschis
     fclose(file);
@@ -131,7 +122,7 @@ image load_image(char* path_to_image) {
  */
 bool save_image(char *path_to_save, image image) {
     char route[PATH_MAX];
-    int32_t k;
+    int32_t i, j, zero = 0, contor = 0;
     FILE *file;
 
     // Incarcarea rutei catre program in variabila route
@@ -165,13 +156,16 @@ bool save_image(char *path_to_save, image image) {
     fwrite(&(image.header.no_colors), 1, 4, file);
     fwrite(&(image.header.no_imp_colors), 1, 4, file);
 
-    for (k = 0; k < image.header.width*image.header.height; k ++) {
-        fwrite(&((*(image.pixels+k)).B), 1, 1, file);
-        fwrite(&((*(image.pixels+k)).G), 1, 1, file);
-        fwrite(&((*(image.pixels+k)).R), 1, 1, file);
+    for (i = 0; i < image.header.height; i ++) {
+        for (j = 0; j < image.header.width; j ++) {
+            fwrite(&((*(image.pixels+contor)).B), 1, 1, file);
+            fwrite(&((*(image.pixels+contor)).G), 1, 1, file);
+            fwrite(&((*(image.pixels+contor)).R), 1, 1, file);
+            contor ++ ;
+        }
+        fwrite(&zero, 1, (size_t)image.padding, file);
     }
     fclose(file);
-
     return true;
 }
 
@@ -242,7 +236,7 @@ uint32_t* generate_random_values(uint32_t seed, uint32_t block_size) {
  * un pointer catre inceputul tabloului de permutari
  * sau pointerul NULL daca nu s-a putut face alocarea de memorie
  */
-uint32_t* generate_permutation(uint32_t* r, uint32_t block_size) {
+uint32_t* generate_permutation(uint32_t const* r, uint32_t block_size) {
     uint32_t *permutation = (uint32_t*) calloc(block_size, sizeof(uint32_t)), i, random;
     if (permutation == NULL) {
         printf("Nu s-a putut aloca memorie necesara pentru permutari.");
@@ -261,6 +255,30 @@ uint32_t* generate_permutation(uint32_t* r, uint32_t block_size) {
 }
 
 /*
+ * Genereaza inversa permutari necesara pentru interschimbarea pixelilor.
+ *
+ * Paramteri:
+ * *permutation - permutarea pentru care trebuie sa se calculeze inversa
+ * block_size - marimea w*h a imaginii
+ *
+ * Returneaza:
+ * un pointer catre inceputul tabloului de permutari
+ * sau pointerul NULL daca nu s-a putut face alocarea de memorie
+ */
+uint32_t* reverse_permutation(uint32_t const* permutation, uint32_t block_size) {
+    uint32_t i = 0;
+    uint32_t *rev_permutation = (uint32_t*)calloc(block_size, sizeof(uint32_t));
+    if (rev_permutation == NULL) {
+        printf("Nu s-a putut aloca memorie necesara pentru inversa permutari.");
+        return NULL;
+    }
+    for(i = 0; i < block_size; i ++) {
+        *(rev_permutation + *(permutation+i)) = i;
+    }
+    return rev_permutation;
+}
+
+/*
  * Se realizeaza copierea header-ului imaginii originale in cea criptata,
  * se permuta fiecare pixel si se cripteaza conform problemei.
  *
@@ -276,11 +294,12 @@ uint32_t* generate_permutation(uint32_t* r, uint32_t block_size) {
  * Returneaza imaginea criptata cu valorile corespunzatoare fiecarui camp
  * sau o structura goala in cazul in care nu s-a putut aloca numarul de pixeli necesari.
  */
-image crypting_method(image real_image, uint32_t *r, uint32_t *permutation, uint32_t SV) {
+image crypting_method(image real_image, uint32_t const* r, uint32_t const* permutation, uint32_t SV) {
     image ciphered_image;
     uint32_t size = (uint32_t)real_image.header.width * real_image.header.height , i;
 
     ciphered_image.header = real_image.header;
+    ciphered_image.padding = real_image.padding;
     ciphered_image.pixels = (image_colors*) calloc(size, sizeof(image_colors));
     if (ciphered_image.pixels == NULL) {
         printf("Nu s-a putut aloca memorie necesara pentru imaginea criptata.");
@@ -297,11 +316,62 @@ image crypting_method(image real_image, uint32_t *r, uint32_t *permutation, uint
 
     // Generarea restului de pixeli conform C(k)=C(k-1)^P'(k)^r(w*h+k)
     for (i = 1; i < (uint32_t)(real_image.header.width*real_image.header.height); i ++) {
-        (*(ciphered_image.pixels + i)).R = (unsigned char)(((*(ciphered_image.pixels + (i-1))).R)^((*(ciphered_image.pixels)).R)^(*(r+size+i)));
-        (*(ciphered_image.pixels + i)).G = (unsigned char)(((*(ciphered_image.pixels + (i-1))).G)^((*(ciphered_image.pixels)).G)^(*(r+size+i)));
-        (*(ciphered_image.pixels + i)).B = (unsigned char)(((*(ciphered_image.pixels + (i-1))).B)^((*(ciphered_image.pixels)).B)^(*(r+size+i)));
+        (*(ciphered_image.pixels + i)).R = (unsigned char)(((*(ciphered_image.pixels + (i-1))).R)^((*(ciphered_image.pixels + i)).R)^(*(r+size+i)));
+        (*(ciphered_image.pixels + i)).G = (unsigned char)(((*(ciphered_image.pixels + (i-1))).G)^((*(ciphered_image.pixels + i)).G)^(*(r+size+i)));
+        (*(ciphered_image.pixels + i)).B = (unsigned char)(((*(ciphered_image.pixels + (i-1))).B)^((*(ciphered_image.pixels + i)).B)^(*(r+size+i)));
     }
     return ciphered_image;
+}
+
+/*
+ * Se realizeaza copierea header-ului imaginii criptate in cea decriptata,
+ * se decripteaza conform problemei si se permuta pixelii
+ *
+ * Parametri:
+ * ciphered_image - structura imaginii care trebuie decriptata
+ * *r - pointer la inceputul tabloului de valori pseudo-aleatoare
+ * *permutation - pointer la inceputul permutarii inverse
+ * SV - cheia secreta
+ *
+ * Se presupune ca *r si *permutation au marimile necesare altfel nu se
+ * ajunge pana la apelul acestei functii.
+ *
+ * Returneaza imaginea decriptata cu valorile corespunzatoare fiecarui camp
+ * sau o structura goala in cazul in care nu s-a putut aloca numarul de pixeli necesari.
+ */
+image decrypting_method(image ciphered_image, uint32_t const* r, uint32_t const* permutation, uint32_t SV) {
+    image tmp_image, real_image;
+    uint32_t size = (uint32_t)ciphered_image.header.width * ciphered_image.header.height, i;
+    tmp_image.header = ciphered_image.header;
+    tmp_image.padding = ciphered_image.padding;
+    real_image.header = ciphered_image.header;
+    real_image.padding = ciphered_image.padding;
+    tmp_image.pixels = (image_colors*) calloc(size, sizeof(image_colors));
+    real_image.pixels = (image_colors*) calloc(size, sizeof(image_colors));
+
+    if (tmp_image.pixels == NULL) {
+        printf("Nu s-a putut aloca memorie necesara pentru imaginea decriptata.");
+        return NOTHING_IMAGE;
+    }
+    if (real_image.pixels == NULL) {
+        printf("Nu s-a putut aloca memorie necesara pentru imaginea decriptata.");
+        return NOTHING_IMAGE;
+    }
+
+    (*(tmp_image.pixels)).R = (unsigned char)((SV)^(*(ciphered_image.pixels)).R^(*(r+size)));
+    (*(tmp_image.pixels)).G = (unsigned char)((SV)^(*(ciphered_image.pixels)).G^(*(r+size)));
+    (*(tmp_image.pixels)).B = (unsigned char)((SV)^(*(ciphered_image.pixels)).B^(*(r+size)));
+
+    for (i = 1; i < size; i ++) {
+        (*(tmp_image.pixels + i)).R = (unsigned char)(((*(ciphered_image.pixels + (i-1))).R)^((*(ciphered_image.pixels + i)).R)^(*(r+size+i)));
+        (*(tmp_image.pixels + i)).G = (unsigned char)(((*(ciphered_image.pixels + (i-1))).G)^((*(ciphered_image.pixels + i)).G)^(*(r+size+i)));
+        (*(tmp_image.pixels + i)).B = (unsigned char)(((*(ciphered_image.pixels + (i-1))).B)^((*(ciphered_image.pixels + i)).B)^(*(r+size+i)));
+    }
+    for (i = 0; i < size; i ++)
+        (*(real_image.pixels + *(permutation+i))) = (*(tmp_image.pixels + i));
+
+    free(tmp_image.pixels);
+    return real_image;
 }
 
 /*
@@ -325,7 +395,96 @@ bool crypting_image(char *path_to_image, char *path_to_crypt, char *secret_path)
 
     if ((r = generate_random_values(secret.secret_r0, 2*block_size)) == NULL) return false;
     if ((permutation = generate_permutation(r, block_size)) == NULL) return false;
-    image_ciphered = crypting_method(image, permutation, r, secret.SV);
+    image_ciphered = crypting_method(image, r, permutation, secret.SV);
     save_image(path_to_crypt, image_ciphered);
+
+    //Eliberam memoria
+    free(r);
+    free(permutation);
+    free(image.pixels);
+    free(image_ciphered.pixels);
     return true;
+}
+
+/*
+ * Functia de decriptare a imaginii
+ *
+ * Parametri:
+ * path_to_image - imaginea ce urmeaza sa fie decriptata
+ * path_to_decrypt - imaginea decriptata
+ * secret_path - fisierul ce contine cele 2 chei secrete
+ *
+ * Returneaza:
+ * false - daca nu s-a putut crea imaginea criptata
+ * true - daca nu a fost nici-o problema in crearea imaginii
+ */
+bool decrypting_image(char *path_to_image, char *path_to_decrypt, char *secret_path) {
+    image image, image_deciphered;
+    secret_key secret = get_secret_key(secret_path);
+    image = load_image(path_to_image);
+    uint32_t block_size = (uint32_t)image.header.width*image.header.height;
+    uint32_t *r , *permutation, *rev_permutation;
+
+    if ((r = generate_random_values(secret.secret_r0, 2*block_size)) == NULL) return false;
+    if ((permutation = generate_permutation(r, block_size)) == NULL) return false;
+    if ((rev_permutation = reverse_permutation(permutation, block_size)) == NULL) return false;
+    // Eliberam memoria de care nu mai avem nevoie pentru a face mai mult loc
+    free(permutation);
+    image_deciphered = decrypting_method(image, r, rev_permutation, secret.SV);
+    save_image(path_to_decrypt, image_deciphered);
+    //Eliberam memoria
+    free(r);
+    free(rev_permutation);
+    free(image.pixels);
+    free(image_deciphered.pixels);
+    return true;
+}
+
+float suma(image img, int n, float fm, unsigned char chanel, float (*expresie)(image, float, uint32_t, unsigned char)) {
+    uint32_t i = 0;
+    float s = 0;
+    for (i = 0; i < n; i ++) {
+        s = s + expresie(img, fm, i, chanel);
+    }
+    return s;
+}
+
+
+float expresie(image image, float fm, uint32_t i, unsigned char chanel) {
+    int32_t k;
+    float fi = 0;
+    for (k = 0; k < image.header.height*image.header.width; k ++) {
+        switch (chanel) {
+            case 'R':
+                if ((*(image.pixels + k)).R == i) fi += 1;
+                break;
+            case 'G':
+                if ((*(image.pixels + k)).G == i) fi += 1;
+                break;
+            case 'B':
+                if ((*(image.pixels + k)).B == i) fi += 1;
+                break;
+            default:
+                return 0;
+        }
+
+    }
+    return (((fi-fm)*(fi-fm))/fm);
+}
+
+/*
+ * Calculul testului chi-patrat
+ *
+ * Parametri:
+ * path_to_image - numele imaginii
+ */
+void chisquare_test(char *path_to_image) {
+    image img;
+    img = load_image(path_to_image);
+    printf("(%f, %f, %f)", suma(img, 256, (float)(img.header.width*img.header.height)/256, 'R', expresie),
+           suma(img, 256, (float)(img.header.width*img.header.height)/256, 'G', expresie),
+           suma(img, 256, (float)(img.header.width*img.header.height)/256, 'B', expresie)
+    );
+    //Eliberam memoria
+    free(img.pixels);
 }

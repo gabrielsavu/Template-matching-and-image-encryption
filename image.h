@@ -38,9 +38,13 @@ typedef struct {
     unsigned char R, G, B;
 } image_colors;
 
+/*
+ * Structura imaginii
+ */
 typedef struct {
     image_colors *pixels;       // Imaginea in forma liniarizata
     image_header header;        // Header-ul imaginii
+    int32_t padding;
 } image;
 
 typedef struct {
@@ -48,5 +52,9 @@ typedef struct {
 } secret_key;
 
 bool crypting_image(char *path_to_image, char *path_to_crypt, char *secret_path);
+
+bool decrypting_image(char *path_to_image, char *path_to_decrypt, char *secret_path);
+
+void chisquare_test(char *path_to_image);
 
 #endif //PP_PROIECT_IMAGE_H
