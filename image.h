@@ -51,10 +51,30 @@ typedef struct {
     uint32_t secret_r0, SV;
 } secret_key;
 
+typedef struct {
+    uint32_t width, height;
+    double ps;
+    int32_t x, y;
+} window;
+
 bool crypting_image(char *path_to_image, char *path_to_crypt, char *secret_path);
 
 bool decrypting_image(char *path_to_image, char *path_to_decrypt, char *secret_path);
 
 void chisquare_test(char *path_to_image);
+
+void grayscale_image(char* path_to_image, char* path_to_grey);
+
+image load_image(char* path_to_image);
+
+bool save_image(char *path_to_save, image image);
+
+void template_matching(image img, image template, float ps, window *fi);
+
+double sigma_fi(uint32_t n, window fi, image img);
+
+double sigma_s(uint32_t n, image template);
+
+void draw_window(image img, window fi);
 
 #endif //PP_PROIECT_IMAGE_H

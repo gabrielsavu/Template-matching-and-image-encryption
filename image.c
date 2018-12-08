@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <math.h>
 #include "image.h"
 
 #define NOTHING_IMAGE (image){.pixels = NULL, .header=0}
@@ -440,7 +441,7 @@ bool decrypting_image(char *path_to_image, char *path_to_decrypt, char *secret_p
     return true;
 }
 
-float suma(image img, int n, float fm, unsigned char chanel, float (*expresie)(image, float, uint32_t, unsigned char)) {
+float suma_chitest(image img, int n, float fm, unsigned char chanel, float (*expresie)(image, float, uint32_t, unsigned char)) {
     uint32_t i = 0;
     float s = 0;
     for (i = 0; i < n; i ++) {
@@ -481,10 +482,125 @@ float expresie(image image, float fm, uint32_t i, unsigned char chanel) {
 void chisquare_test(char *path_to_image) {
     image img;
     img = load_image(path_to_image);
-    printf("(%f, %f, %f)", suma(img, 256, (float)(img.header.width*img.header.height)/256, 'R', expresie),
-           suma(img, 256, (float)(img.header.width*img.header.height)/256, 'G', expresie),
-           suma(img, 256, (float)(img.header.width*img.header.height)/256, 'B', expresie)
+    printf("(%f, %f, %f)", suma_chitest(img, 256, (float)(img.header.width*img.header.height)/256, 'R', expresie),
+           suma_chitest(img, 256, (float)(img.header.width*img.header.height)/256, 'G', expresie),
+           suma_chitest(img, 256, (float)(img.header.width*img.header.height)/256, 'B', expresie)
     );
     //Eliberam memoria
     free(img.pixels);
+}
+
+
+
+
+
+
+
+void grayscale_image(char* path_to_image, char* path_to_grey) {
+    image img;
+    unsigned char aux;
+    img = load_image(path_to_image);
+    uint32_t size = (uint32_t)img.header.width * img.header.height, i;
+    // Transformam fiecare pixel in grey
+    for (i = 0; i < size; i ++) {
+        aux = (unsigned char)(0.299*((*(img.pixels+i)).R) + 0.587*((*(img.pixels+i)).G) + 0.114*((*(img.pixels+i)).B));
+        ((*(img.pixels+i)).B) = ((*(img.pixels+i)).G) = ((*(img.pixels+i)).R) = aux;
+    }
+    save_image(path_to_grey, img);
+    // Eliberam memoria
+    free(img.pixels);
+}
+
+
+void template_matching(image img, image template, float ps, window *fi) {
+    uint32_t i, j, k, l, n, contor = 1;
+    double calc = 0, fm = 0, sm = 0, sig_s, sig_fi;
+    fi = (window*) calloc(contor, sizeof(window));
+    (*fi).height = (uint32_t)template.header.height;
+    (*fi).width = (uint32_t)template.header.width;
+    n = ((*(fi+(contor-1))).height)*((*(fi+(contor-1))).width);
+    for (i = 0; i < (*(fi+(contor-1))).height; i ++) {
+        for (j = 0; j < (*(fi+(contor-1))).width; j ++) {
+            fm = fm + ((*(img.pixels + img.header.width*((*(fi+(contor-1))).y+i) + (*(fi+(contor-1))).x + j)).R);
+        }
+    }
+    for (i = 0; i < template.header.height*template.header.width; i ++) {
+        sm = sm + ((*(template.pixels + i)).R);
+    }
+    sm = sm/n;
+    fm = fm/n;
+
+    for (k = 0; k < img.header.height; k ++) {
+        for (l = 0; l < img.header.width; l++) {
+            if ((l + (*(fi+(contor-1))).width) < img.header.width && (k + (*(fi+(contor-1))).height) < img.header.height) {
+                (*(fi+(contor-1))).x = k;
+                (*(fi+(contor-1))).y = l;
+                sig_fi = sigma_fi(n, *(fi+(contor-1)), img);
+                sig_s = sigma_s(n, template);
+                for (i = 0; i < (*(fi+(contor-1))).height; i++) {
+                    for (j = 0; j < (*(fi+(contor-1))).width; j++) {
+                        calc = calc + (((*(img.pixels + (img.header.width * ((*(fi+(contor-1))).x + i) + (*(fi+(contor-1))).y + j))).R - fm)*((*(template.pixels + (i*(*(fi+(contor-1))).width) + j)).R - sm));
+
+                    }
+                }
+                calc = calc / (sig_fi*sig_s);
+                calc = calc / n;
+                (*(fi+(contor-1))).ps = calc;
+                if (calc >= ps) {
+                    contor ++;
+                    fi = realloc(fi, contor*sizeof(window));
+                }
+            }
+        }
+    }
+}
+
+double sigma_fi(uint32_t n, window fi, image img) {
+
+    uint32_t i, j;
+    double calc = 0, fm = 0;
+    for (i = 0; i < fi.height; i ++) {
+        for (j = 0; j < fi.width; j ++) {
+            fm = fm + ((*(img.pixels + img.header.width*(fi.x+i) + fi.y + j)).R);
+        }
+    }
+    fm = fm/n;
+    for (i = 0; i < fi.height; i ++) {
+        for (j = 0; j < fi.width; j ++) {
+            calc = calc + pow(((*(img.pixels + img.header.width*(fi.x+i) + fi.y + j)).R - fm), 2);
+        }
+    }
+    calc = calc/(n-1);
+    calc = sqrt(calc);
+    return calc;
+}
+
+double sigma_s(uint32_t n, image template) {
+
+    uint32_t i, k;
+    double calc = 0, sm = 0;
+    for (k = 0; k < template.header.height*template.header.width; k ++) {
+        sm = sm + ((*(template.pixels + k)).R);
+    }
+    sm = sm/n;
+    for (i = 0; i < template.header.height*template.header.width; i ++) {
+        calc = calc + pow(((*(template.pixels + i)).R - sm), 2);
+    }
+    calc = calc/(n-1);
+    calc = sqrt(calc);
+    return calc;
+}
+
+
+void draw_window(image img, window fi) {
+    uint32_t i, j;
+    for (i = 0; i < fi.height; i ++) {
+        for (j = 0; j < fi.width; j ++) {
+            if ((fi.x+i == fi.x || (fi.x + fi.height - 1) == fi.x+i) || fi.y + j == fi.y || fi.y+j == (fi.y + fi.width - 1)) {
+                (*(img.pixels + img.header.width*(fi.x+i) + fi.y + j)).R = 255;
+                (*(img.pixels + img.header.width*(fi.x+i) + fi.y + j)).G = 0;
+                (*(img.pixels + img.header.width*(fi.x+i) + fi.y + j)).B = 0;
+            }
+        }
+    }
 }
