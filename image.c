@@ -28,6 +28,17 @@ bool get_route(char route[PATH_MAX]) {
 }
 
 /*
+ * Calculul ariei dreptunghiului cu lungimea x respectiv latimea y
+ *
+ * Paramteri:
+ * x - lungimea(latimea)
+ * y - latimea(lungimea)
+ */
+static inline uint32_t area(uint32_t x, uint32_t y) {
+    return x*y;
+}
+
+/*
  * https://en.wikipedia.org/wiki/Xorshift
  */
 uint32_t xorshift32(uint32_t state[static 1]) {
@@ -95,12 +106,13 @@ image load_image(char* path_to_image) {
         printf("Eroare la alocarea de memorie necesara pentru imagine.\n");
         return NOTHING_IMAGE;
     }
+
     // Salvam fiecare valoare a fiecarui pixel in variabila declarata mai sus
     for (i = 0; i < tmp_image.header.height; i ++) {
         for (j = 0; j < tmp_image.header.width; j ++) {
-            fread(&(*(tmp_image.pixels + contor)).B, 1, 1, file);
-            fread(&(*(tmp_image.pixels + contor)).G, 1, 1, file);
-            fread(&(*(tmp_image.pixels + contor)).R, 1, 1, file);
+            fread(&(*(tmp_image.pixels + tmp_image.header.width*(tmp_image.header.height-(i+1)) + j)).B, 1, 1, file);
+            fread(&(*(tmp_image.pixels + tmp_image.header.width*(tmp_image.header.height-(i+1)) + j)).G, 1, 1, file);
+            fread(&(*(tmp_image.pixels + tmp_image.header.width*(tmp_image.header.height-(i+1)) + j)).R, 1, 1, file);
             contor ++ ;
         }
         fseek(file, tmp_image.padding, SEEK_CUR);
@@ -159,9 +171,9 @@ bool save_image(char *path_to_save, image image) {
 
     for (i = 0; i < image.header.height; i ++) {
         for (j = 0; j < image.header.width; j ++) {
-            fwrite(&((*(image.pixels+contor)).B), 1, 1, file);
-            fwrite(&((*(image.pixels+contor)).G), 1, 1, file);
-            fwrite(&((*(image.pixels+contor)).R), 1, 1, file);
+            fwrite(&((*(image.pixels + image.header.width*(image.header.height-(i+1)) + j)).B), 1, 1, file);
+            fwrite(&((*(image.pixels + image.header.width*(image.header.height-(i+1)) + j)).G), 1, 1, file);
+            fwrite(&((*(image.pixels + image.header.width*(image.header.height-(i+1)) + j)).R), 1, 1, file);
             contor ++ ;
         }
         fwrite(&zero, 1, (size_t)image.padding, file);
@@ -238,7 +250,8 @@ uint32_t* generate_random_values(uint32_t seed, uint32_t block_size) {
  * sau pointerul NULL daca nu s-a putut face alocarea de memorie
  */
 uint32_t* generate_permutation(uint32_t const* r, uint32_t block_size) {
-    uint32_t *permutation = (uint32_t*) calloc(block_size, sizeof(uint32_t)), i, random;
+
+    uint32_t *permutation = (uint32_t*) calloc(block_size, sizeof(uint32_t)), i, random, contor = 1;
     if (permutation == NULL) {
         printf("Nu s-a putut aloca memorie necesara pentru permutari.");
         return NULL;
@@ -246,12 +259,14 @@ uint32_t* generate_permutation(uint32_t const* r, uint32_t block_size) {
     for (i = 0; i < block_size; i ++)
         *(permutation+i) = i;
 
-    for (i = block_size; i > 0; i --) {
-        random = *(r+i)%i;
+    for (i = block_size - 1; i > 0; i --) {
+        random = (*(r+contor))%(i+1);
         uint32_t temp = *(permutation+i);
         *(permutation+i) = *(permutation+random);
         *(permutation+random) = temp;
+        contor ++;
     }
+
     return permutation;
 }
 
@@ -295,7 +310,7 @@ uint32_t* reverse_permutation(uint32_t const* permutation, uint32_t block_size) 
  * Returneaza imaginea criptata cu valorile corespunzatoare fiecarui camp
  * sau o structura goala in cazul in care nu s-a putut aloca numarul de pixeli necesari.
  */
-image crypting_method(image real_image, uint32_t const* r, uint32_t const* permutation, uint32_t SV) {
+image crypting_method(image real_image, uint32_t *r, uint32_t const* permutation, uint32_t SV) {
     image ciphered_image;
     uint32_t size = (uint32_t)real_image.header.width * real_image.header.height , i;
 
@@ -306,20 +321,31 @@ image crypting_method(image real_image, uint32_t const* r, uint32_t const* permu
         printf("Nu s-a putut aloca memorie necesara pentru imaginea criptata.");
         return NOTHING_IMAGE;
     }
+
     // Permutarea pixelilor conform permutari
     for (i = 0; i < size; i ++)
         (*(ciphered_image.pixels + *(permutation+i))) = (*(real_image.pixels + i));
 
+
     // Initializarea primului pixel conform C(0)=SV^P'(0)^r(w*h)
-    (*(ciphered_image.pixels)).R = (unsigned char)((SV)^(*(ciphered_image.pixels)).R^(*(r+size)));
-    (*(ciphered_image.pixels)).G = (unsigned char)((SV)^(*(ciphered_image.pixels)).G^(*(r+size)));
-    (*(ciphered_image.pixels)).B = (unsigned char)((SV)^(*(ciphered_image.pixels)).B^(*(r+size)));
+    (*(ciphered_image.pixels)).B = (unsigned char)((SV&0b11111111)^(*(ciphered_image.pixels)).B^((*(r+size))&0b11111111));
+    SV = SV >> 8;
+    (*(r+size)) = (*(r+size)) >> 8;
+    (*(ciphered_image.pixels)).G = (unsigned char)((SV&0b11111111)^(*(ciphered_image.pixels)).G^((*(r+size))&0b11111111));
+    SV = SV >> 8;
+    (*(r+size)) = (*(r+size)) >> 8;
+    (*(ciphered_image.pixels)).R = (unsigned char)((SV&0b11111111)^(*(ciphered_image.pixels)).R^((*(r+size))&0b11111111));
+
 
     // Generarea restului de pixeli conform C(k)=C(k-1)^P'(k)^r(w*h+k)
     for (i = 1; i < (uint32_t)(real_image.header.width*real_image.header.height); i ++) {
-        (*(ciphered_image.pixels + i)).R = (unsigned char)(((*(ciphered_image.pixels + (i-1))).R)^((*(ciphered_image.pixels + i)).R)^(*(r+size+i)));
-        (*(ciphered_image.pixels + i)).G = (unsigned char)(((*(ciphered_image.pixels + (i-1))).G)^((*(ciphered_image.pixels + i)).G)^(*(r+size+i)));
-        (*(ciphered_image.pixels + i)).B = (unsigned char)(((*(ciphered_image.pixels + (i-1))).B)^((*(ciphered_image.pixels + i)).B)^(*(r+size+i)));
+        (*(ciphered_image.pixels + i)).B = (unsigned char)(((*(ciphered_image.pixels + (i-1))).B)^((*(ciphered_image.pixels + i)).B)^((*(r+size+i))&0b11111111));
+        (*(r+size+i)) = (*(r+size+i)) >> 8;
+        (*(ciphered_image.pixels + i)).G = (unsigned char)(((*(ciphered_image.pixels + (i-1))).G)^((*(ciphered_image.pixels + i)).G)^((*(r+size+i))&0b11111111));
+        (*(r+size+i)) = (*(r+size+i)) >> 8;
+        (*(ciphered_image.pixels + i)).R = (unsigned char)(((*(ciphered_image.pixels + (i-1))).R)^((*(ciphered_image.pixels + i)).R)^((*(r+size+i))&0b11111111));
+
+
     }
     return ciphered_image;
 }
@@ -340,7 +366,7 @@ image crypting_method(image real_image, uint32_t const* r, uint32_t const* permu
  * Returneaza imaginea decriptata cu valorile corespunzatoare fiecarui camp
  * sau o structura goala in cazul in care nu s-a putut aloca numarul de pixeli necesari.
  */
-image decrypting_method(image ciphered_image, uint32_t const* r, uint32_t const* permutation, uint32_t SV) {
+image decrypting_method(image ciphered_image, uint32_t * r, uint32_t const* permutation, uint32_t SV) {
     image tmp_image, real_image;
     uint32_t size = (uint32_t)ciphered_image.header.width * ciphered_image.header.height, i;
     tmp_image.header = ciphered_image.header;
@@ -359,14 +385,19 @@ image decrypting_method(image ciphered_image, uint32_t const* r, uint32_t const*
         return NOTHING_IMAGE;
     }
 
-    (*(tmp_image.pixels)).R = (unsigned char)((SV)^(*(ciphered_image.pixels)).R^(*(r+size)));
-    (*(tmp_image.pixels)).G = (unsigned char)((SV)^(*(ciphered_image.pixels)).G^(*(r+size)));
-    (*(tmp_image.pixels)).B = (unsigned char)((SV)^(*(ciphered_image.pixels)).B^(*(r+size)));
+    (*(tmp_image.pixels)).B = (unsigned char)((SV&0b11111111)^(*(ciphered_image.pixels)).B^(*(r+size)));
+    SV = SV >> 8;
+    (*(tmp_image.pixels)).G = (unsigned char)((SV&0b11111111)^(*(ciphered_image.pixels)).G^(*(r+size)));
+    SV = SV >> 8;
+    (*(tmp_image.pixels)).R = (unsigned char)((SV&0b11111111)^(*(ciphered_image.pixels)).R^(*(r+size)));
 
     for (i = 1; i < size; i ++) {
-        (*(tmp_image.pixels + i)).R = (unsigned char)(((*(ciphered_image.pixels + (i-1))).R)^((*(ciphered_image.pixels + i)).R)^(*(r+size+i)));
-        (*(tmp_image.pixels + i)).G = (unsigned char)(((*(ciphered_image.pixels + (i-1))).G)^((*(ciphered_image.pixels + i)).G)^(*(r+size+i)));
-        (*(tmp_image.pixels + i)).B = (unsigned char)(((*(ciphered_image.pixels + (i-1))).B)^((*(ciphered_image.pixels + i)).B)^(*(r+size+i)));
+        (*(tmp_image.pixels + i)).B = (unsigned char)(((*(ciphered_image.pixels + (i-1))).B)^((*(ciphered_image.pixels + i)).B)^((*(r+size+i))&0b11111111));
+        ((*(r+size+i))) = ((*(r+size+i))) >> 8;
+        (*(tmp_image.pixels + i)).G = (unsigned char)(((*(ciphered_image.pixels + (i-1))).G)^((*(ciphered_image.pixels + i)).G)^((*(r+size+i))&0b11111111));
+        ((*(r+size+i))) = ((*(r+size+i))) >> 8;
+        (*(tmp_image.pixels + i)).R = (unsigned char)(((*(ciphered_image.pixels + (i-1))).R)^((*(ciphered_image.pixels + i)).R)^((*(r+size+i))&0b11111111));
+
     }
     for (i = 0; i < size; i ++)
         (*(real_image.pixels + *(permutation+i))) = (*(tmp_image.pixels + i));
@@ -441,17 +472,28 @@ bool decrypting_image(char *path_to_image, char *path_to_decrypt, char *secret_p
     return true;
 }
 
-float suma_chitest(image img, int n, float fm, unsigned char chanel, float (*expresie)(image, float, uint32_t, unsigned char)) {
+/*
+ * Calculul sumei chisquare
+ *
+ * Parametri:
+ * img - imaginea pe care se face calculul
+ * fm - constanta width*height/256
+ * chanel - canalul pe care se face calculul(R,G,B)
+ * *expression - expresia de sub suma
+ */
+float sigma_chitest(image img, int n, float fm, unsigned char chanel, float (*expression)(image, float, uint32_t, unsigned char)) {
     uint32_t i = 0;
     float s = 0;
     for (i = 0; i < n; i ++) {
-        s = s + expresie(img, fm, i, chanel);
+        s = s + expression(img, fm, i, chanel);
     }
     return s;
 }
 
-
-float expresie(image image, float fm, uint32_t i, unsigned char chanel) {
+/*
+ * Expresia de sub sigma
+ */
+float expression(image image, float fm, uint32_t i, unsigned char chanel) {
     int32_t k;
     float fi = 0;
     for (k = 0; k < image.header.height*image.header.width; k ++) {
@@ -468,7 +510,6 @@ float expresie(image image, float fm, uint32_t i, unsigned char chanel) {
             default:
                 return 0;
         }
-
     }
     return (((fi-fm)*(fi-fm))/fm);
 }
@@ -482,20 +523,22 @@ float expresie(image image, float fm, uint32_t i, unsigned char chanel) {
 void chisquare_test(char *path_to_image) {
     image img;
     img = load_image(path_to_image);
-    printf("(%f, %f, %f)", suma_chitest(img, 256, (float)(img.header.width*img.header.height)/256, 'R', expresie),
-           suma_chitest(img, 256, (float)(img.header.width*img.header.height)/256, 'G', expresie),
-           suma_chitest(img, 256, (float)(img.header.width*img.header.height)/256, 'B', expresie)
+    printf("(%f, %f, %f)", sigma_chitest(img, 256, (float)(img.header.width*img.header.height)/256, 'R', expression),
+           sigma_chitest(img, 256, (float)(img.header.width*img.header.height)/256, 'G', expression),
+           sigma_chitest(img, 256, (float)(img.header.width*img.header.height)/256, 'B', expression)
     );
     //Eliberam memoria
     free(img.pixels);
 }
 
 
-
-
-
-
-
+/*
+ * Transformarea imaginii path_to_image in imagine grayscale
+ *
+ * Paramteri:
+ * path_to_image - locatia catre imaginea ce urmeaza sa se transforme
+ * path_to_grey - loactia catre imaginea grayscale
+ */
 void grayscale_image(char* path_to_image, char* path_to_grey) {
     image img;
     unsigned char aux;
@@ -511,63 +554,30 @@ void grayscale_image(char* path_to_image, char* path_to_grey) {
     free(img.pixels);
 }
 
-
-void template_matching(image img, image template, float ps, window *fi) {
-    uint32_t i, j, k, l, n, contor = 1;
-    double calc = 0, fm = 0, sm = 0, sig_s, sig_fi;
-    fi = (window*) calloc(contor, sizeof(window));
-    (*fi).height = (uint32_t)template.header.height;
-    (*fi).width = (uint32_t)template.header.width;
-    n = ((*(fi+(contor-1))).height)*((*(fi+(contor-1))).width);
-    for (i = 0; i < (*(fi+(contor-1))).height; i ++) {
-        for (j = 0; j < (*(fi+(contor-1))).width; j ++) {
-            fm = fm + ((*(img.pixels + img.header.width*((*(fi+(contor-1))).y+i) + (*(fi+(contor-1))).x + j)).R);
-        }
-    }
-    for (i = 0; i < template.header.height*template.header.width; i ++) {
-        sm = sm + ((*(template.pixels + i)).R);
-    }
-    sm = sm/n;
-    fm = fm/n;
-
-    for (k = 0; k < img.header.height; k ++) {
-        for (l = 0; l < img.header.width; l++) {
-            if ((l + (*(fi+(contor-1))).width) < img.header.width && (k + (*(fi+(contor-1))).height) < img.header.height) {
-                (*(fi+(contor-1))).x = k;
-                (*(fi+(contor-1))).y = l;
-                sig_fi = sigma_fi(n, *(fi+(contor-1)), img);
-                sig_s = sigma_s(n, template);
-                for (i = 0; i < (*(fi+(contor-1))).height; i++) {
-                    for (j = 0; j < (*(fi+(contor-1))).width; j++) {
-                        calc = calc + (((*(img.pixels + (img.header.width * ((*(fi+(contor-1))).x + i) + (*(fi+(contor-1))).y + j))).R - fm)*((*(template.pixels + (i*(*(fi+(contor-1))).width) + j)).R - sm));
-
-                    }
-                }
-                calc = calc / (sig_fi*sig_s);
-                calc = calc / n;
-                (*(fi+(contor-1))).ps = calc;
-                if (calc >= ps) {
-                    contor ++;
-                    fi = realloc(fi, contor*sizeof(window));
-                }
-            }
-        }
-    }
-}
-
-double sigma_fi(uint32_t n, window fi, image img) {
+/*
+ * Returneaza calculul ecuatiei sigma_fi
+ *
+ * Parametri:
+ * n - numarul de pixeli latime*lungime al sablonului
+ * height - inaltimea imaginii
+ * width - latimea imaginii pe care se aplica template_matching
+ * height - inaltimea imaginii pe care se aplica template_matching
+ * pos - structura x0y a pozitiei ferestrei in imagine
+ * img - imaginea pe care se aplica template_matching
+ */
+double sigma_fi(uint32_t n, uint32_t height, uint32_t width, x0y pos, image img) {
 
     uint32_t i, j;
     double calc = 0, fm = 0;
-    for (i = 0; i < fi.height; i ++) {
-        for (j = 0; j < fi.width; j ++) {
-            fm = fm + ((*(img.pixels + img.header.width*(fi.x+i) + fi.y + j)).R);
+    for (i = 0; i < height; i ++) {
+        for (j = 0; j < width; j ++) {
+            fm = fm + ((*(img.pixels + img.header.width*(pos.x+i) + pos.y + j)).R);
         }
     }
     fm = fm/n;
-    for (i = 0; i < fi.height; i ++) {
-        for (j = 0; j < fi.width; j ++) {
-            calc = calc + pow(((*(img.pixels + img.header.width*(fi.x+i) + fi.y + j)).R - fm), 2);
+    for (i = 0; i < height; i ++) {
+        for (j = 0; j < width; j ++) {
+            calc = calc + pow(((*(img.pixels + img.header.width*(pos.x+i) + pos.y + j)).R - fm), 2);
         }
     }
     calc = calc/(n-1);
@@ -575,6 +585,13 @@ double sigma_fi(uint32_t n, window fi, image img) {
     return calc;
 }
 
+/*
+ * Returneaza calculul ecuatiei sigma_s
+ *
+ * Parametri:
+ * n - numarul de pixeli latime*lungime al sablonului
+ * template - sablonul pe care se va face calculul
+ */
 double sigma_s(uint32_t n, image template) {
 
     uint32_t i, k;
@@ -591,16 +608,136 @@ double sigma_s(uint32_t n, image template) {
     return calc;
 }
 
-
-void draw_window(image img, window fi) {
+/*
+ * Desenarea in imginea img a conturii ferestrelor fi.
+ *
+ * Paramteri:
+ * img - imaginea
+ * fi - ferestrele
+ * index - index-ul ferestrei
+ */
+void draw_window(image img, window fi, uint32_t index) {
     uint32_t i, j;
     for (i = 0; i < fi.height; i ++) {
         for (j = 0; j < fi.width; j ++) {
-            if ((fi.x+i == fi.x || (fi.x + fi.height - 1) == fi.x+i) || fi.y + j == fi.y || fi.y+j == (fi.y + fi.width - 1)) {
-                (*(img.pixels + img.header.width*(fi.x+i) + fi.y + j)).R = 255;
-                (*(img.pixels + img.header.width*(fi.x+i) + fi.y + j)).G = 0;
-                (*(img.pixels + img.header.width*(fi.x+i) + fi.y + j)).B = 0;
+            if ((*(fi.pos + index)).x+i == (*(fi.pos + index)).x || ((*(fi.pos + index)).x + fi.height - 1) == (*(fi.pos + index)).x+i || (*(fi.pos + index)).y + j == (*(fi.pos + index)).y || (*(fi.pos + index)).y+j == ((*(fi.pos + index)).y + fi.width - 1)) {
+                (*(img.pixels + img.header.width*((*(fi.pos + index)).x+i) + (*(fi.pos + index)).y + j)).R = (*(fi.pos + index)).colors.R;
+                (*(img.pixels + img.header.width*((*(fi.pos + index)).x+i) + (*(fi.pos + index)).y + j)).G = (*(fi.pos + index)).colors.G;
+                (*(img.pixels + img.header.width*((*(fi.pos + index)).x+i) + (*(fi.pos + index)).y + j)).B = (*(fi.pos + index)).colors.B;
             }
         }
     }
+}
+
+void template_matching(image img, image template, float ps, window *fi, image_colors colors) {
+    uint32_t i, j, k, l, n, contor = 1;
+    double calc = 0, fm = 0, sm = 0, sig_s, sig_fi;
+    (*fi).pos = (x0y*) calloc(1, sizeof(x0y));
+    (*fi).height = (uint32_t)template.header.height;
+    (*fi).width = (uint32_t)template.header.width;
+
+
+    n = (uint32_t)template.header.height*(uint32_t)template.header.width;
+    for (i = 0; i < template.header.height; i ++) {
+        for (j = 0; j < template.header.width; j ++) {
+            fm = fm + ((*(img.pixels + img.header.width*((*((*fi).pos+(contor-1))).y+i) + (*((*fi).pos+(contor-1))).x + j)).R);
+        }
+    }
+    for (i = 0; i < template.header.height*template.header.width; i ++) {
+        sm = sm + ((*(template.pixels + i)).R);
+    }
+    sm = sm/n;
+    fm = fm/n;
+
+    for (k = 0; k < img.header.height; k ++) {
+        for (l = 0; l < img.header.width; l++) {
+            if ((l + template.header.width) < img.header.width && (k + template.header.height) < img.header.height) {
+                (*((*fi).pos+(contor-1))).x = k;
+                (*((*fi).pos+(contor-1))).y = l;
+                (*((*fi).pos+(contor-1))).colors = colors;
+                sig_fi = sigma_fi(n, (uint32_t)template.header.height, (uint32_t)template.header.width, (*((*fi).pos+(contor-1))), img);
+                sig_s = sigma_s(n, template);
+                for (i = 0; i < template.header.height; i++) {
+                    for (j = 0; j < template.header.width; j++) {
+                        calc = calc + (((*(img.pixels + (img.header.width * ((*((*fi).pos+(contor-1))).x + i) + (*((*fi).pos+(contor-1))).y + j))).R - fm)*((*(template.pixels + (i*template.header.width) + j)).R - sm));
+
+                    }
+                }
+                calc = calc / (sig_fi*sig_s);
+                calc = calc / n;
+                (*((*fi).pos+(contor-1))).ps = calc;
+                if (calc >= ps) {
+                    contor ++;
+                    (*fi).pos = (x0y*) realloc((*fi).pos ,contor*sizeof(x0y));
+                }
+            }
+        }
+    }
+    (*fi).matches = contor - 1;
+}
+
+/*
+ * Functia comparator pentru qsort.
+ */
+int cmp_function(const void *a, const void *b) {
+    x0y c = *(x0y*)a;
+    x0y d = *(x0y*)b;
+
+    if (c.ps > d.ps) return -1;
+    else return 1;
+}
+
+/*
+ * Eliminarea non-maximelor
+ *
+ *
+ */
+window merge_windows(window *win, uint32_t n) {
+    window return_window;
+    uint32_t i, j, k, contor = 0;
+    float sp;
+    return_window.pos = (x0y*) calloc(1, sizeof(x0y));
+
+    return_window.height = win[0].height;
+    return_window.width = win[0].width;
+
+    return_window.matches = 0;
+    for (i = 0; i < n; i ++) {
+        for (j = 0; j < win[i].matches; j ++) {
+            *(return_window.pos + contor) = *((*(win + i)).pos + j);
+            contor ++;
+            return_window.pos = (x0y*) realloc(return_window.pos, (contor+1)*sizeof(x0y));
+        }
+        return_window.matches += win[i].matches;
+    }
+    qsort((void*)return_window.pos, return_window.matches, sizeof(x0y), cmp_function);
+    for (i = 0; i < return_window.matches - 1; i ++) {
+        for (j = i + 1; j < return_window.matches; j ++) {
+            sp = 0;
+            //Cadranul 4
+            if (return_window.pos[i].x <= return_window.pos[j].x && (return_window.pos[i].x + return_window.height) >= return_window.pos[j].x && return_window.pos[i].y <= return_window.pos[j].y && (return_window.pos[i].y + return_window.width) >= return_window.pos[j].y) {
+                sp = (float)(area(return_window.pos[i].y + return_window.width - return_window.pos[j].y, return_window.pos[i].x + return_window.height - return_window.pos[j].x))/(area(return_window.height, return_window.width)+area(return_window.height, return_window.width)-area(return_window.pos[i].y + return_window.width - return_window.pos[j].y, return_window.pos[i].x + return_window.height - return_window.pos[j].x));
+            }
+            //Cadranul 1
+            else if (return_window.pos[i].x >= return_window.pos[j].x && (return_window.pos[j].x + return_window.height) >= return_window.pos[i].x && return_window.pos[i].y <= return_window.pos[j].y && (return_window.pos[i].y + return_window.width) >= return_window.pos[j].y) {
+                sp = (float)(area(return_window.pos[i].y + return_window.width - return_window.pos[j].y, return_window.pos[j].x + return_window.height - return_window.pos[i].x))/(area(return_window.height, return_window.width)+area(return_window.height, return_window.width)-area(return_window.pos[i].y + return_window.width - return_window.pos[j].y, return_window.pos[j].x + return_window.height - return_window.pos[i].x));
+            }
+            //Cadranul 2
+            else if (return_window.pos[i].x >= return_window.pos[j].x && (return_window.pos[j].x + return_window.height) >= return_window.pos[i].x && return_window.pos[i].y >= return_window.pos[j].y && (return_window.pos[j].y + return_window.width) >= return_window.pos[i].y) {
+                sp = (float)(area(return_window.pos[j].y + return_window.width - return_window.pos[i].y, return_window.pos[j].x + return_window.height - return_window.pos[i].x))/(area(return_window.height, return_window.width)+area(return_window.height, return_window.width)-area(return_window.pos[j].y + return_window.width - return_window.pos[i].y, return_window.pos[j].x + return_window.height - return_window.pos[i].x));
+            }
+            //Cadranul 3
+            else if (return_window.pos[i].x <= return_window.pos[j].x && (return_window.pos[i].x + return_window.height) >= return_window.pos[j].x && return_window.pos[i].y >= return_window.pos[j].y && (return_window.pos[j].y + return_window.width) >= return_window.pos[i].y) {
+                sp = (float)(area(return_window.pos[j].y + return_window.width - return_window.pos[i].y, return_window.pos[i].x + return_window.height - return_window.pos[j].x))/(area(return_window.height, return_window.width)+area(return_window.height, return_window.width)-area(return_window.pos[j].y + return_window.width - return_window.pos[i].y, return_window.pos[i].x + return_window.height - return_window.pos[j].x));
+            }
+            if (sp > 0.2) {
+                for (k = j; k < return_window.matches - 1; k ++) {
+                    return_window.pos[k] = return_window.pos[k+1];
+                }
+                return_window.matches --;
+                return_window.pos = (x0y*) realloc(return_window.pos, return_window.matches*sizeof(x0y));
+            }
+        }
+    }
+    return return_window;
 }

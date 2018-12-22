@@ -52,9 +52,14 @@ typedef struct {
 } secret_key;
 
 typedef struct {
-    uint32_t width, height;
+    uint32_t x, y;
+    image_colors colors;
     double ps;
-    int32_t x, y;
+} x0y;
+
+typedef struct {
+    uint32_t width, height, matches;
+    x0y *pos;
 } window;
 
 bool crypting_image(char *path_to_image, char *path_to_crypt, char *secret_path);
@@ -69,12 +74,10 @@ image load_image(char* path_to_image);
 
 bool save_image(char *path_to_save, image image);
 
-void template_matching(image img, image template, float ps, window *fi);
+void template_matching(image img, image template, float ps, window *fi, image_colors colors);
 
-double sigma_fi(uint32_t n, window fi, image img);
+void draw_window(image img, window fi, uint32_t index);
 
-double sigma_s(uint32_t n, image template);
-
-void draw_window(image img, window fi);
+window merge_windows(window *win, uint32_t n);
 
 #endif //PP_PROIECT_IMAGE_H
