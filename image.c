@@ -523,7 +523,7 @@ float expression(image image, float fm, uint32_t i, unsigned char chanel) {
 void chisquare_test(char *path_to_image) {
     image img;
     img = load_image(path_to_image);
-    printf("(%f, %f, %f)", sigma_chitest(img, 256, (float)(img.header.width*img.header.height)/256, 'R', expression),
+    printf("(%f, %f, %f)\n", sigma_chitest(img, 256, (float)(img.header.width*img.header.height)/256, 'R', expression),
            sigma_chitest(img, 256, (float)(img.header.width*img.header.height)/256, 'G', expression),
            sigma_chitest(img, 256, (float)(img.header.width*img.header.height)/256, 'B', expression)
     );
@@ -629,6 +629,14 @@ void draw_window(image img, window fi, uint32_t index) {
     }
 }
 
+/*
+ * Paramteri:
+ * img - imaginea pe care urmeaza se se aplice algoritmul
+ * template - sablonul
+ * ps - pragul minim de detectie
+ * fi - ferestrele furnizate de functie in urma algoritmului
+ * colors - culoarea ferestrelor
+ */
 void template_matching(image img, image template, float ps, window *fi, image_colors colors) {
     uint32_t i, j, k, l, n, contor = 1;
     double calc = 0, fm = 0, sm = 0, sig_s, sig_fi;
@@ -690,7 +698,9 @@ int cmp_function(const void *a, const void *b) {
 /*
  * Eliminarea non-maximelor
  *
- *
+ * Paramteri:
+ * win - vectorul de ferestre pentru fiecare sablon
+ * n - numarul de sabloane
  */
 window merge_windows(window *win, uint32_t n) {
     window return_window;
