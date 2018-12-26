@@ -121,6 +121,7 @@ int main() {
                 free(template_cifra[7].pixels);
                 free(template_cifra[8].pixels);
                 free(template_cifra[9].pixels);
+                break;
             }
             default: {
                 printf("Comanda necunoscuta.\n");

@@ -15,13 +15,12 @@
 #define NOTHING_SECRET (secret_key){.secret_r0 = 0, .SV = 0}
 
 /*
- * Preluare rutei catre program
+ * Preluare rutei catre fisierul programului
  * Returneaza:
  * false - daca nu s-a putut prelua ruta programului
  * true - daca nu a fost nici-o problema
  */
 bool get_route(char route[PATH_MAX]) {
-    getcwd(route, PATH_MAX);
     if (getcwd(route, PATH_MAX) == NULL) return false;
     strcat(route, "\\");
     return true;
@@ -29,10 +28,6 @@ bool get_route(char route[PATH_MAX]) {
 
 /*
  * Calculul ariei dreptunghiului cu lungimea x respectiv latimea y
- *
- * Paramteri:
- * x - lungimea(latimea)
- * y - latimea(lungimea)
  */
 static inline uint32_t area(uint32_t x, uint32_t y) {
     return x*y;
@@ -480,6 +475,8 @@ bool decrypting_image(char *path_to_image, char *path_to_decrypt, char *secret_p
  * fm - constanta width*height/256
  * chanel - canalul pe care se face calculul(R,G,B)
  * *expression - expresia de sub suma
+ *
+ * Returneaza suma de pe canalul 'chanel'.
  */
 float sigma_chitest(image img, int n, float fm, unsigned char chanel, float (*expression)(image, float, uint32_t, unsigned char)) {
     uint32_t i = 0;
@@ -741,6 +738,7 @@ window merge_windows(window *win, uint32_t n) {
                 sp = (float)(area(return_window.pos[j].y + return_window.width - return_window.pos[i].y, return_window.pos[i].x + return_window.height - return_window.pos[j].x))/(area(return_window.height, return_window.width)+area(return_window.height, return_window.width)-area(return_window.pos[j].y + return_window.width - return_window.pos[i].y, return_window.pos[i].x + return_window.height - return_window.pos[j].x));
             }
             if (sp > 0.2) {
+                // Eliminarea elemntului
                 for (k = j; k < return_window.matches - 1; k ++) {
                     return_window.pos[k] = return_window.pos[k+1];
                 }
