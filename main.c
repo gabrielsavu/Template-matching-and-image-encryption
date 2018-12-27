@@ -1,6 +1,7 @@
 /*
- * main.cpp
+ * main.c
  * Created by Savu Liviu Gabriel on 29.11.2018.
+ * Compiled by mingw w64
  */
 
 #include <stdio.h>
@@ -8,7 +9,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include <time.h>
 #include <float.h>
 #include <inttypes.h>
 #include "image.h"
@@ -18,13 +18,20 @@
 int main() {
 
     unsigned option;
-    char path_to_image[255], path_to_crypt[255], path_to_decrypt[255], secret_key[255];
+    char *path_to_image, *path_to_crypt, *path_to_decrypt, *secret_key;
+
+
+    path_to_image = calloc(256, sizeof(char));
+    path_to_crypt = calloc(256, sizeof(char));
+    path_to_decrypt = calloc(256, sizeof(char));
+    secret_key = calloc(256, sizeof(char));
+
     printf("Options:\n");
     printf("0 - Exit\n");
-    printf("1 - Criptare imagine\n");
-    printf("2 - Decriptare imagine:\n");
-    printf("3 - chi-square test:\n");
-    printf("4 - Template-matching:\n");
+    printf("1 - Criptare imagine;\n");
+    printf("2 - Decriptare imagine;\n");
+    printf("3 - chi-square test;\n");
+    printf("4 - Template-matching pentru imaginea test.bmp.\n");
     do {
         scanf("%u", &option);
         switch (option) {
@@ -66,37 +73,66 @@ int main() {
                 break;
             }
             case 4: {
-                grayscale_image("test.bmp", "test_grey.bmp");
-                image img, template_cifra[10];
-                img = load_image("test_grey.bmp");
-                window fi[10], merge;
-                uint32_t i;
+                printf("Imaginea:\n");
+                char *path_to_grey;
+                char *ptr;
+                path_to_grey = calloc(256, sizeof(char));
+                scanf("%s" , path_to_image);
+                strcpy(path_to_grey, path_to_image);
+                ptr = strstr(path_to_grey, ".bmp");
+                strcpy(ptr, "_grey.bmp");
 
+                printf("Se calculeaza...\n");
+                grayscale_image(path_to_image, path_to_grey);
+                image img, *template_cifra;
+                template_cifra = calloc(10, sizeof(image));
+                img = load_image(path_to_grey);
+
+                window fi[10], merge;
                 template_cifra[0] = load_image("sabloane\\cifra0.bmp");
                 template_matching(img, template_cifra[0], 0.5, &(fi[0]), (image_colors){255, 0, 0});
+                free(template_cifra[0].pixels);
+
                 template_cifra[1] = load_image("sabloane\\cifra1.bmp");
                 template_matching(img, template_cifra[1], 0.5, &(fi[1]), (image_colors){255, 255, 0});
+                free(template_cifra[1].pixels);
+
                 template_cifra[2] = load_image("sabloane\\cifra2.bmp");
                 template_matching(img, template_cifra[2], 0.5, &(fi[2]), (image_colors){0, 255, 0});
+                free(template_cifra[2].pixels);
+
                 template_cifra[3] = load_image("sabloane\\cifra3.bmp");
                 template_matching(img, template_cifra[3], 0.5, &(fi[3]), (image_colors){0, 255, 255});
+                free(template_cifra[3].pixels);
+
                 template_cifra[4] = load_image("sabloane\\cifra4.bmp");
                 template_matching(img, template_cifra[4], 0.5, &(fi[4]), (image_colors){255, 0, 255});
+                free(template_cifra[4].pixels);
+
                 template_cifra[5] = load_image("sabloane\\cifra5.bmp");
                 template_matching(img, template_cifra[5], 0.5, &(fi[5]), (image_colors){0, 0, 255});
+                free(template_cifra[5].pixels);
+
                 template_cifra[6] = load_image("sabloane\\cifra6.bmp");
                 template_matching(img, template_cifra[6], 0.5, &(fi[6]), (image_colors){192, 192, 192});
+                free(template_cifra[6].pixels);
+
                 template_cifra[7] = load_image("sabloane\\cifra7.bmp");
                 template_matching(img, template_cifra[7], 0.5, &(fi[7]), (image_colors){255, 140, 0});
+                free(template_cifra[7].pixels);
+
                 template_cifra[8] = load_image("sabloane\\cifra8.bmp");
                 template_matching(img, template_cifra[8], 0.5, &(fi[8]), (image_colors){128, 0, 128});
+                free(template_cifra[8].pixels);
+
                 template_cifra[9] = load_image("sabloane\\cifra9.bmp");
                 template_matching(img, template_cifra[9], 0.5, &(fi[9]), (image_colors){128, 0, 0});
+                free(template_cifra[9].pixels);
 
                 merge = merge_windows(fi, 10);
 
-                for (i = 0; i < merge.matches; i ++)
-                    draw_window(img, merge, i);
+
+                draw_windows(img, merge);
 
                 save_image("template_matching.bmp", img);
 
@@ -111,16 +147,7 @@ int main() {
                 free(fi[8].pos);
                 free(fi[9].pos);
                 free(merge.pos);
-                free(template_cifra[0].pixels);
-                free(template_cifra[1].pixels);
-                free(template_cifra[2].pixels);
-                free(template_cifra[3].pixels);
-                free(template_cifra[4].pixels);
-                free(template_cifra[5].pixels);
-                free(template_cifra[6].pixels);
-                free(template_cifra[7].pixels);
-                free(template_cifra[8].pixels);
-                free(template_cifra[9].pixels);
+                printf("Algoritmul de template_matching s-a aplicat pe imaginea test.bmp: template_matching.bmp\n");
                 break;
             }
             default: {

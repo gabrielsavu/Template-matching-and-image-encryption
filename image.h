@@ -1,6 +1,7 @@
 /*
  * image.h
  * Created by Savu Liviu Gabriel on 29.11.2018.
+ * Compiled by mingw w64
  */
 
 #ifndef PP_PROIECT_IMAGE_H
@@ -62,22 +63,22 @@ typedef struct {
     x0y *pos;
 } window;
 
+image load_image(char* path_to_image);
+
+bool save_image(char *path_to_save, image image);
+
 bool crypting_image(char *path_to_image, char *path_to_crypt, char *secret_path);
 
 bool decrypting_image(char *path_to_image, char *path_to_decrypt, char *secret_path);
 
 void chisquare_test(char *path_to_image);
 
-void grayscale_image(char* path_to_image, char* path_to_grey);
+bool grayscale_image(char* path_to_image, char* path_to_grey);
 
-image load_image(char* path_to_image);
-
-bool save_image(char *path_to_save, image image);
-
-void template_matching(image img, image template, float ps, window *fi, image_colors colors);
-
-void draw_window(image img, window fi, uint32_t index);
+void template_matching(image img, image template, float ps, window *win, image_colors colors);
 
 window merge_windows(window *win, uint32_t n);
+
+void draw_windows(image img, window win);
 
 #endif //PP_PROIECT_IMAGE_H

@@ -1,6 +1,7 @@
 /*
- * image.cpp
+ * image.c
  * Created by Savu Liviu Gabriel on 29.11.2018.
+ * Compiled by mingw w64
  */
 
 #include <stdlib.h>
@@ -15,7 +16,9 @@
 #define NOTHING_SECRET (secret_key){.secret_r0 = 0, .SV = 0}
 
 /*
- * Preluare rutei catre fisierul programului
+ * Preluarea rutei catre fisierul programului cu ajutorul fucției
+ * getcwd din librăria ‘unistd.h’. Ruta este furnizată prin parametrul ‘route’.
+ *
  * Returneaza:
  * false - daca nu s-a putut prelua ruta programului
  * true - daca nu a fost nici-o problema
@@ -27,7 +30,7 @@ bool get_route(char route[PATH_MAX]) {
 }
 
 /*
- * Calculul ariei dreptunghiului cu lungimea x respectiv latimea y
+ * Calculul ariei dreptunghiului cu lungimea x respectiv lățimea y.
  */
 static inline uint32_t area(uint32_t x, uint32_t y) {
     return x*y;
@@ -46,13 +49,13 @@ uint32_t xorshift32(uint32_t state[static 1]) {
 }
 
 /*
- * Incarcarea imaginii in memoria interna.
+ * Încărcarea imaginii in memoria internă sub structura ‘image’.
  *
  * Parametri:
- * path_to_image - numele fisierului
+ * path_to_image - numele fișierului.
  *
- * Returneaza o structura image cu valorile corespunzatoare fiecarui camp
- * sau o structura goala in cazul in care nu s-a putut face citirea.
+ * Returnează o structură ‘image’ cu valorile corespunzătoare fiecărui camp sau
+ * o structură ‘image’ goală în cazul în care nu s-a putut face citirea.
  */
 image load_image(char* path_to_image) {
     int32_t i, j, contor = 0;
@@ -118,15 +121,15 @@ image load_image(char* path_to_image) {
 }
 
 /*
- * Salvarea imaginii in memoria externa.
+ * Salvarea imaginii în memoria externă.
  *
  * Parametri:
- * path_to_save - numele fisierului
- * image - structura care are informatia
+ * path_to_save - numele fișierului;
+ * image - structura care are informația.
  *
- * Returneaza:
- * false - daca nu s-a putut salva imaginea
- * true - daca nu a fost nici-o problema
+ * Returnează:
+ * false - dacă nu s-a putut salva imaginea.
+ * true - dacă nu a fost nici-o problemă.
  */
 bool save_image(char *path_to_save, image image) {
     char route[PATH_MAX];
@@ -178,13 +181,13 @@ bool save_image(char *path_to_save, image image) {
 }
 
 /*
- * Citirea cheilor secrete din fisier.
+ * Citirea cheilor secrete din fișier.
  *
  * Parametri:
- * path_to_secret - numele fisierului cu cheiile secrete
+ * path_to_secret - numele fișierului cu cheiile secrete.
  *
- * Returneaza o structura secret_key cu valorile corespunzatoare fiecarui camp
- * sau o structura goala in cazul in care nu s-a putut face citirea.
+ * Returnează o structură secret_key cu valorile corespunzatoare
+ * fiecărui camp sau o structură goală în cazul în care nu s-a putut face citirea.
  */
 secret_key get_secret_key(char *path_to_secret) {
     FILE *file;
@@ -209,15 +212,15 @@ secret_key get_secret_key(char *path_to_secret) {
 }
 
 /*
- * Genereaza cele 2*W*H-1 valori pseudo-random folosind algoritmul xorshift32.
+ * Generează cele 2*W*H-1 valori pseudo-random folosind algoritmul xorshift32.
  *
  * Parametri:
- * seed - valoarea cheii secrete
- * block_size - marimea w*h a imaginii
+ * seed - valoarea cheii secrete;
+ * block_size - mărimea width*height a imaginii.
  *
- * Returneaza:
- * pointer catre inceputul tabloului de valori pseudo-random
- * sau pointerul NULL daca nu s-a putut face alocarea de memorie.
+ * Returnează:
+ * Pointer catre începutul tabloului de valori pseudo-random sau pointerul NULL
+ * dacă nu s-a putut face alocarea de memorie.
  */
 uint32_t* generate_random_values(uint32_t seed, uint32_t block_size) {
     uint32_t *r = (uint32_t*) calloc(block_size, sizeof(uint32_t));
@@ -234,15 +237,15 @@ uint32_t* generate_random_values(uint32_t seed, uint32_t block_size) {
 }
 
 /*
- * Genereaza permutarea necesara pentru interschimbarea pixelilor.
+ * Generează permutarea necesară pentru interschimbarea pixelilor conform algoritmulu Fisher-Yatesi.
  *
  * Paramteri:
- * *r - pointer la inceputul tabloului de valori pseudo-aleatoare
- * block_size - marimea w*h a imaginii
+ * *r - pointer la începutul tabloului de valori pseudo-aleatoare;
+ * block_size - mărimea width*height a imaginii.
  *
- * Returneaza:
- * un pointer catre inceputul tabloului de permutari
- * sau pointerul NULL daca nu s-a putut face alocarea de memorie
+ * Returnează:
+ * Pointer catre începutul tabloului de permutări sau pointerul NULL
+ * dacă nu s-a putut face alocarea de memorie.
  */
 uint32_t* generate_permutation(uint32_t const* r, uint32_t block_size) {
 
@@ -266,15 +269,15 @@ uint32_t* generate_permutation(uint32_t const* r, uint32_t block_size) {
 }
 
 /*
- * Genereaza inversa permutari necesara pentru interschimbarea pixelilor.
+ * Generează inversa permutării necesară pentru interschimbarea pixelilor.
  *
  * Paramteri:
- * *permutation - permutarea pentru care trebuie sa se calculeze inversa
- * block_size - marimea w*h a imaginii
+ * *permutation - permutarea pentru care trebuie să se calculeze inversa;
+ * block_size - mărimea width*height a imaginii.
  *
- * Returneaza:
- * un pointer catre inceputul tabloului de permutari
- * sau pointerul NULL daca nu s-a putut face alocarea de memorie
+ * Returnează:
+ * Pointer catre începutul tabloului de permutări sau pointerul NULL
+ * dacă nu s-a putut face alocarea de memorie.
  */
 uint32_t* reverse_permutation(uint32_t const* permutation, uint32_t block_size) {
     uint32_t i = 0;
@@ -290,20 +293,18 @@ uint32_t* reverse_permutation(uint32_t const* permutation, uint32_t block_size) 
 }
 
 /*
- * Se realizeaza copierea header-ului imaginii originale in cea criptata,
- * se permuta fiecare pixel si se cripteaza conform problemei.
+ * Se realizează copierea header-ului imaginii originale în cea criptată,
+ * se permută fiecare pixel și se criptează conform problemei.
  *
  * Parametri:
- * real_image - structura imaginii care trebuie criptata
- * *r - pointer la inceputul tabloului de valori pseudo-aleatoare
- * *permutation - pointer la inceputul permutarii
- * SV - cheia secreta
+ * real_image - structura imaginii care trebuie criptată;
+ * *r - pointer la începutul tabloului de valori pseudo-aleatoare;
+ * *permutation - pointer la începutul permutării;
+ * SV - cheia secretă.
  *
- * Se presupune ca *r si *permutation au marimile necesare altfel nu se
- * ajunge pana la apelul acestei functii.
- *
- * Returneaza imaginea criptata cu valorile corespunzatoare fiecarui camp
- * sau o structura goala in cazul in care nu s-a putut aloca numarul de pixeli necesari.
+ * Se presupune ca *r si *permutation au mărimile necesare altfel nu se ajunge până la apelul acestei funcții.
+ * Returnează imaginea criptată cu valorile corespunzătoare fiecărui camp sau
+ * o structură de tip 'image' goală în cazul în care nu s-a putut aloca numărul de pixeli necesari.
  */
 image crypting_method(image real_image, uint32_t *r, uint32_t const* permutation, uint32_t SV) {
     image ciphered_image;
@@ -346,20 +347,17 @@ image crypting_method(image real_image, uint32_t *r, uint32_t const* permutation
 }
 
 /*
- * Se realizeaza copierea header-ului imaginii criptate in cea decriptata,
- * se decripteaza conform problemei si se permuta pixelii
- *
+ * Se realizează copierea header-ului imaginii criptate in cea decriptată,
+ * se decriptează conform problemei și se permută pixelii.
  * Parametri:
- * ciphered_image - structura imaginii care trebuie decriptata
- * *r - pointer la inceputul tabloului de valori pseudo-aleatoare
- * *permutation - pointer la inceputul permutarii inverse
- * SV - cheia secreta
+ * ciphered_image - structura imaginii care trebuie decriptată;
+ * *r - pointer la începutul tabloului de valori pseudo-aleatoare;
+ * *permutation - pointer la începutul permutarii inverse;
+ * SV - cheia secretă.
  *
- * Se presupune ca *r si *permutation au marimile necesare altfel nu se
- * ajunge pana la apelul acestei functii.
- *
- * Returneaza imaginea decriptata cu valorile corespunzatoare fiecarui camp
- * sau o structura goala in cazul in care nu s-a putut aloca numarul de pixeli necesari.
+ * Se presupune că *r si *permutation au mărimile necesare altfel nu se ajunge până la apelul acestei funcții.
+ * Returnează imaginea decriptată cu valorile corespunzatoare fiecărui câmp sau
+ * o structură de tip 'image' goală în cazul în care nu s-a putut aloca numarul de pixeli necesari.
  */
 image decrypting_method(image ciphered_image, uint32_t * r, uint32_t const* permutation, uint32_t SV) {
     image tmp_image, real_image;
@@ -402,20 +400,21 @@ image decrypting_method(image ciphered_image, uint32_t * r, uint32_t const* perm
 }
 
 /*
- * Functia de criptare a imaginii
+ * Funcția de criptare a imaginii.
  *
  * Parametri:
- * path_to_image - imaginea ce urmeaza sa fie criptata
- * path_to_crypt - imaginea criptata
- * secret_path - fisierul ce contine cele 2 chei secrete
+ * path_to_image - imaginea ce urmează sa fie criptată;
+ * path_to_crypt - imaginea criptată;
+ * secret_path - fișierul ce conține cele 2 chei secrete.
  *
- * Returneaza:
- * false - daca nu s-a putut crea imaginea criptata
- * true - daca nu a fost nici-o problema in crearea imaginii
+ * Returnează:
+ * false - dacă nu s-a putut crea imaginea criptată.
+ * true - dacă nu a fost nici-o problemă în crearea imaginii.
  */
 bool crypting_image(char *path_to_image, char *path_to_crypt, char *secret_path) {
     image image, image_ciphered;
     secret_key secret = get_secret_key(secret_path);
+    if (secret.SV == 0) return false;
     image = load_image(path_to_image);
     uint32_t block_size = (uint32_t)image.header.width*image.header.height;
     uint32_t *r , *permutation;
@@ -423,6 +422,7 @@ bool crypting_image(char *path_to_image, char *path_to_crypt, char *secret_path)
     if ((r = generate_random_values(secret.secret_r0, 2*block_size)) == NULL) return false;
     if ((permutation = generate_permutation(r, block_size)) == NULL) return false;
     image_ciphered = crypting_method(image, r, permutation, secret.SV);
+    if (image_ciphered.pixels == NULL) return false;
     save_image(path_to_crypt, image_ciphered);
 
     //Eliberam memoria
@@ -434,20 +434,21 @@ bool crypting_image(char *path_to_image, char *path_to_crypt, char *secret_path)
 }
 
 /*
- * Functia de decriptare a imaginii
+ * Funcția de decriptare a imaginii.
  *
  * Parametri:
- * path_to_image - imaginea ce urmeaza sa fie decriptata
- * path_to_decrypt - imaginea decriptata
- * secret_path - fisierul ce contine cele 2 chei secrete
+ * path_to_image - imaginea ce urmează să fie decriptată;
+ * path_to_decrypt - imaginea decriptată;
+ * secret_path - fișierul ce conține cele 2 chei secrete.
  *
- * Returneaza:
- * false - daca nu s-a putut crea imaginea criptata
- * true - daca nu a fost nici-o problema in crearea imaginii
+ * Returnează:
+ * false - dacă nu s-a putut crea imaginea criptată.
+ * true - dacă nu a fost nici-o problemă în crearea imaginii.
  */
 bool decrypting_image(char *path_to_image, char *path_to_decrypt, char *secret_path) {
     image image, image_deciphered;
     secret_key secret = get_secret_key(secret_path);
+    if (secret.SV == 0) return false;
     image = load_image(path_to_image);
     uint32_t block_size = (uint32_t)image.header.width*image.header.height;
     uint32_t *r , *permutation, *rev_permutation;
@@ -458,6 +459,7 @@ bool decrypting_image(char *path_to_image, char *path_to_decrypt, char *secret_p
     // Eliberam memoria de care nu mai avem nevoie pentru a face mai mult loc
     free(permutation);
     image_deciphered = decrypting_method(image, r, rev_permutation, secret.SV);
+    if (image_deciphered.pixels == NULL) return false;
     save_image(path_to_decrypt, image_deciphered);
     //Eliberam memoria
     free(r);
@@ -468,15 +470,15 @@ bool decrypting_image(char *path_to_image, char *path_to_decrypt, char *secret_p
 }
 
 /*
- * Calculul sumei chisquare
+ * Calculul sumei chisquare.
  *
  * Parametri:
- * img - imaginea pe care se face calculul
- * fm - constanta width*height/256
- * chanel - canalul pe care se face calculul(R,G,B)
- * *expression - expresia de sub suma
+ * img - imaginea pe care se face calculul;
+ * fm - constanta (width*height)/256;
+ * chanel - canalul pe care se face calculul(R,G,B);
+ * *expression - expresia de sub suma.
  *
- * Returneaza suma de pe canalul 'chanel'.
+ * Returnează suma de pe canalul 'chanel'.
  */
 float sigma_chitest(image img, int n, float fm, unsigned char chanel, float (*expression)(image, float, uint32_t, unsigned char)) {
     uint32_t i = 0;
@@ -530,37 +532,39 @@ void chisquare_test(char *path_to_image) {
 
 
 /*
- * Transformarea imaginii path_to_image in imagine grayscale
+ * Transformarea imaginii ‘path_to_image’ în imagine grayscale.
  *
  * Paramteri:
- * path_to_image - locatia catre imaginea ce urmeaza sa se transforme
- * path_to_grey - loactia catre imaginea grayscale
+ * path_to_image - numele imaginii ce urmează să se transforme;
+ * path_to_grey - numele imaginii grayscale.
  */
-void grayscale_image(char* path_to_image, char* path_to_grey) {
+bool grayscale_image(char* path_to_image, char* path_to_grey) {
     image img;
     unsigned char aux;
     img = load_image(path_to_image);
+    if (img.pixels == NULL) return false;
     uint32_t size = (uint32_t)img.header.width * img.header.height, i;
     // Transformam fiecare pixel in grey
     for (i = 0; i < size; i ++) {
         aux = (unsigned char)(0.299*((*(img.pixels+i)).R) + 0.587*((*(img.pixels+i)).G) + 0.114*((*(img.pixels+i)).B));
         ((*(img.pixels+i)).B) = ((*(img.pixels+i)).G) = ((*(img.pixels+i)).R) = aux;
     }
-    save_image(path_to_grey, img);
+    if (save_image(path_to_grey, img) == false) return false;
     // Eliberam memoria
     free(img.pixels);
+    return true;
 }
 
 /*
- * Returneaza calculul ecuatiei sigma_fi
+ * Returnează calculul ecuației sigma_fi
  *
  * Parametri:
- * n - numarul de pixeli latime*lungime al sablonului
- * height - inaltimea imaginii
- * width - latimea imaginii pe care se aplica template_matching
- * height - inaltimea imaginii pe care se aplica template_matching
- * pos - structura x0y a pozitiei ferestrei in imagine
- * img - imaginea pe care se aplica template_matching
+ * n - numărul de pixeli width*height al șablonului;
+ * height - înaltimea imaginii pe care se aplică template_matching;
+ * width - lațimea imaginii pe care se aplică template_matching;
+ * height - înalțimea imaginii pe care se aplică template_matching;
+ * pos - structura x0y a poziției ferestrei în imagine;
+ * img - imaginea pe care se aplică template_matching.
  */
 double sigma_fi(uint32_t n, uint32_t height, uint32_t width, x0y pos, image img) {
 
@@ -583,11 +587,11 @@ double sigma_fi(uint32_t n, uint32_t height, uint32_t width, x0y pos, image img)
 }
 
 /*
- * Returneaza calculul ecuatiei sigma_s
+ * Returnează calculul ecuației sigma_s.
  *
  * Parametri:
- * n - numarul de pixeli latime*lungime al sablonului
- * template - sablonul pe care se va face calculul
+ * n - numărul de pixeli width*height al șablonului;
+ * template - șablonul pe care se va face calculul.
  */
 double sigma_s(uint32_t n, image template) {
 
@@ -606,21 +610,30 @@ double sigma_s(uint32_t n, image template) {
 }
 
 /*
- * Desenarea in imginea img a conturii ferestrelor fi.
+ * Desenează în imginea ‘img’ conturul ferestrelor ‘fi’.
  *
  * Paramteri:
- * img - imaginea
- * fi - ferestrele
- * index - index-ul ferestrei
+ * img - imaginea pe care se va desena;
+ * win - vectorul de ferestre din care se va desena;
+ * n - numarul de ferestre din vectorul 'win'.
  */
-void draw_window(image img, window fi, uint32_t index) {
-    uint32_t i, j;
-    for (i = 0; i < fi.height; i ++) {
-        for (j = 0; j < fi.width; j ++) {
-            if ((*(fi.pos + index)).x+i == (*(fi.pos + index)).x || ((*(fi.pos + index)).x + fi.height - 1) == (*(fi.pos + index)).x+i || (*(fi.pos + index)).y + j == (*(fi.pos + index)).y || (*(fi.pos + index)).y+j == ((*(fi.pos + index)).y + fi.width - 1)) {
-                (*(img.pixels + img.header.width*((*(fi.pos + index)).x+i) + (*(fi.pos + index)).y + j)).R = (*(fi.pos + index)).colors.R;
-                (*(img.pixels + img.header.width*((*(fi.pos + index)).x+i) + (*(fi.pos + index)).y + j)).G = (*(fi.pos + index)).colors.G;
-                (*(img.pixels + img.header.width*((*(fi.pos + index)).x+i) + (*(fi.pos + index)).y + j)).B = (*(fi.pos + index)).colors.B;
+void draw_windows(image img, window win) {
+    uint32_t k, i, j;
+    for (k = 0; k < win.matches; k++) {
+        for (i = 0; i < win.height; i++) {
+            for (j = 0; j < win.width; j++) {
+                // Desenam numai conturul ferestrei
+                if ((*(win.pos + k)).x + i == (*(win.pos + k)).x ||
+                    ((*(win.pos + k)).x + win.height - 1) == (*(win.pos + k)).x + i ||
+                    (*(win.pos + k)).y + j == (*(win.pos + k)).y ||
+                    (*(win.pos + k)).y + j == ((*(win.pos + k)).y + win.width - 1)) {
+                    (*(img.pixels + img.header.width * ((*(win.pos + k)).x + i) + (*(win.pos + k)).y +
+                       j)).R = (*(win.pos + k)).colors.R;
+                    (*(img.pixels + img.header.width * ((*(win.pos + k)).x + i) + (*(win.pos + k)).y +
+                       j)).G = (*(win.pos + k)).colors.G;
+                    (*(img.pixels + img.header.width * ((*(win.pos + k)).x + i) + (*(win.pos + k)).y +
+                       j)).B = (*(win.pos + k)).colors.B;
+                }
             }
         }
     }
@@ -634,18 +647,18 @@ void draw_window(image img, window fi, uint32_t index) {
  * fi - ferestrele furnizate de functie in urma algoritmului
  * colors - culoarea ferestrelor
  */
-void template_matching(image img, image template, float ps, window *fi, image_colors colors) {
+void template_matching(image img, image template, float ps, window *win, image_colors colors) {
     uint32_t i, j, k, l, n, contor = 1;
     double calc = 0, fm = 0, sm = 0, sig_s, sig_fi;
-    (*fi).pos = (x0y*) calloc(1, sizeof(x0y));
-    (*fi).height = (uint32_t)template.header.height;
-    (*fi).width = (uint32_t)template.header.width;
+    (*win).pos = (x0y*) calloc(1, sizeof(x0y));
+    (*win).height = (uint32_t)template.header.height;
+    (*win).width = (uint32_t)template.header.width;
 
 
     n = (uint32_t)template.header.height*(uint32_t)template.header.width;
     for (i = 0; i < template.header.height; i ++) {
         for (j = 0; j < template.header.width; j ++) {
-            fm = fm + ((*(img.pixels + img.header.width*((*((*fi).pos+(contor-1))).y+i) + (*((*fi).pos+(contor-1))).x + j)).R);
+            fm = fm + ((*(img.pixels + img.header.width*((*((*win).pos+(contor-1))).y+i) + (*((*win).pos+(contor-1))).x + j)).R);
         }
     }
     for (i = 0; i < template.header.height*template.header.width; i ++) {
@@ -657,32 +670,32 @@ void template_matching(image img, image template, float ps, window *fi, image_co
     for (k = 0; k < img.header.height; k ++) {
         for (l = 0; l < img.header.width; l++) {
             if ((l + template.header.width) < img.header.width && (k + template.header.height) < img.header.height) {
-                (*((*fi).pos+(contor-1))).x = k;
-                (*((*fi).pos+(contor-1))).y = l;
-                (*((*fi).pos+(contor-1))).colors = colors;
-                sig_fi = sigma_fi(n, (uint32_t)template.header.height, (uint32_t)template.header.width, (*((*fi).pos+(contor-1))), img);
+                (*((*win).pos+(contor-1))).x = k;
+                (*((*win).pos+(contor-1))).y = l;
+                (*((*win).pos+(contor-1))).colors = colors;
+                sig_fi = sigma_fi(n, (uint32_t)template.header.height, (uint32_t)template.header.width, (*((*win).pos+(contor-1))), img);
                 sig_s = sigma_s(n, template);
                 for (i = 0; i < template.header.height; i++) {
                     for (j = 0; j < template.header.width; j++) {
-                        calc = calc + (((*(img.pixels + (img.header.width * ((*((*fi).pos+(contor-1))).x + i) + (*((*fi).pos+(contor-1))).y + j))).R - fm)*((*(template.pixels + (i*template.header.width) + j)).R - sm));
+                        calc = calc + (((*(img.pixels + (img.header.width * ((*((*win).pos+(contor-1))).x + i) + (*((*win).pos+(contor-1))).y + j))).R - fm)*((*(template.pixels + (i*template.header.width) + j)).R - sm));
 
                     }
                 }
                 calc = calc / (sig_fi*sig_s);
                 calc = calc / n;
-                (*((*fi).pos+(contor-1))).ps = calc;
+                (*((*win).pos+(contor-1))).ps = calc;
                 if (calc >= ps) {
                     contor ++;
-                    (*fi).pos = (x0y*) realloc((*fi).pos ,contor*sizeof(x0y));
+                    (*win).pos = (x0y*) realloc((*win).pos ,contor*sizeof(x0y));
                 }
             }
         }
     }
-    (*fi).matches = contor - 1;
+    (*win).matches = contor - 1;
 }
 
 /*
- * Functia comparator pentru qsort.
+ * Funcția comparator pentru qsort.
  */
 int cmp_function(const void *a, const void *b) {
     x0y c = *(x0y*)a;
@@ -705,19 +718,23 @@ window merge_windows(window *win, uint32_t n) {
     float sp;
     return_window.pos = (x0y*) calloc(1, sizeof(x0y));
 
-    return_window.height = win[0].height;
-    return_window.width = win[0].width;
+    return_window.height = (*win).height;
+    return_window.width = (*win).width;
 
     return_window.matches = 0;
+    // Unirea tuturor ferestrelor in vectorul return_window
     for (i = 0; i < n; i ++) {
-        for (j = 0; j < win[i].matches; j ++) {
+        for (j = 0; j < (*(win + i)).matches; j ++) {
             *(return_window.pos + contor) = *((*(win + i)).pos + j);
             contor ++;
             return_window.pos = (x0y*) realloc(return_window.pos, (contor+1)*sizeof(x0y));
         }
         return_window.matches += win[i].matches;
     }
+    // Sortarea vectorului return_window descrescator.
     qsort((void*)return_window.pos, return_window.matches, sizeof(x0y), cmp_function);
+
+    // Eliminarea non-maximelor
     for (i = 0; i < return_window.matches - 1; i ++) {
         for (j = i + 1; j < return_window.matches; j ++) {
             sp = 0;
